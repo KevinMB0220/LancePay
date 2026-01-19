@@ -64,8 +64,6 @@ A fintech platform that solves the biggest pain point for Nigerian freelancers: 
 For contributors and developers:
 
 - **[CONTRIBUTING.md](./CONTRIBUTING.md)** — How to contribute to this project
-- **[Stellar Migration Guide](./docs/STELLAR_MIGRATION_GUIDE.md)** — Technical guide for Stellar integration
-- **[Stellar Quick Start](./docs/STELLAR_QUICK_START.md)** — Fast-track setup reference
 - **[Code Style Guide](./docs/CODE_STYLE.md)** — Code standards and best practices
 
 ---
