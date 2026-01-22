@@ -40,3 +40,4 @@ export async function sendPaymentReceivedEmail(params: PaymentEmailParams) {
     return { success: false }
   }
 }
+
