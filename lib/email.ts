@@ -18,6 +18,7 @@ interface PaymentEmailParams {
 export async function sendPaymentReceivedEmail(params: PaymentEmailParams) {
   const { to, freelancerName, clientName, invoiceNumber, amount, currency } = params
 
+
   try {
     const { error } = await resend.emails.send({
       from: RESEND_FROM,
@@ -137,4 +138,24 @@ function escapeHtml(input: string): string {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#039;')
+}
+
+
+export async function sendEmail(params: { to: string; subject: string; template: string }) {
+  const { to, subject, template } = params
+
+  try {
+    const { error } = await resend.emails.send({
+      from: RESEND_FROM,
+      to: [to],
+      subject,
+      html: template,
+    })
+
+    if (error) console.error('Email error:', error)
+    return { success: !error }
+  } catch (error) {
+    console.error('Email send failed:', error)
+    return { success: false }
+  }
 }

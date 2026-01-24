@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { fundNewWallet } from '@/lib/stellar'
+import { fundNewWallet } from '@/lib/stellar-funding'
 import { sendAdminAlertEmail } from '@/lib/email'
 import { Prisma } from '@prisma/client'
 
