@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db'
 import { createReferralEarning } from '@/lib/referral'
 import { dispatchWebhooks } from '@/lib/webhooks'
 import { logAuditEvent, extractRequestMetadata } from '@/lib/audit'
+import { processSavingsOnPayment } from '@/lib/savings'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ invoiceId: string }> }) {
   const { invoiceId } = await params
@@ -93,6 +94,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       invoiceAmount: Number(invoice.amount)
     })
   }
+
+  // Process savings goals auto-deduction
+  await processSavingsOnPayment(updatedInvoice.userId, Number(updatedInvoice.amount))
 
   // Process auto-swap
   const { processAutoSwap } = await import('@/lib/auto-swap')
