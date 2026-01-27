@@ -35,6 +35,7 @@ model User {
   apiKeys          ApiKey[]
   brandingSettings BrandingSettings?
   webhooks         UserWebhook[]
+  auditEvents      AuditEvent[]
   savingsGoals     SavingsGoal[]
 }
 
@@ -86,6 +87,7 @@ model Invoice {
   escrowEvents     EscrowEvent[]
   lienActive       Boolean           @default(false)
   advances         PaymentAdvance[]
+  auditEvents      AuditEvent[]
 }
 
 model PaymentReminder {
@@ -303,6 +305,21 @@ model PaymentAdvance {
   @@index([invoiceId])
 }
 
+model AuditEvent {
+  id        String   @id @default(uuid())
+  invoiceId String
+  eventType String   @db.VarChar(50)
+  actorId   String?
+  metadata  Json?
+  signature String
+  createdAt DateTime @default(now())
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  actor   User?   @relation(fields: [actorId], references: [id])
+
+  @@index([invoiceId])
+  @@index([eventType])
+  @@index([createdAt])
 model SavingsGoal {
   id                String   @id @default(uuid())
   userId            String
