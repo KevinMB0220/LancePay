@@ -35,6 +35,7 @@ model User {
   apiKeys          ApiKey[]
   brandingSettings BrandingSettings?
   webhooks         UserWebhook[]
+  savingsGoals     SavingsGoal[]
 }
 
 model Wallet {
@@ -173,7 +174,7 @@ model ApiKey {
 model AutoSwapRule {
   id            String   @id @default(uuid())
   userId        String   @unique
-  percentage    Int // e.g., 70 (for 70%)
+  percentage    Int
   bankAccountId String
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
@@ -186,7 +187,7 @@ model AutoSwapRule {
 model BulkInvoiceJob {
   id           String    @id @default(uuid())
   userId       String
-  status       String    @default("processing") // processing, completed, failed
+  status       String    @default("processing")
   totalCount   Int
   successCount Int       @default(0)
   failedCount  Int       @default(0)
@@ -220,7 +221,7 @@ model Dispute {
 model DisputeMessage {
   id          String   @id @default(uuid())
   disputeId   String
-  senderType  String // 'freelancer', 'client', 'admin'
+  senderType  String
   senderEmail String
   message     String
   attachments Json     @default("[]")
@@ -234,8 +235,8 @@ model DisputeMessage {
 model EscrowEvent {
   id         String   @id @default(uuid())
   invoiceId  String
-  eventType  String // e.g., 'created', 'funded', 'released', 'disputed'
-  actorType  String // 'freelancer', 'client', 'admin', 'system'
+  eventType  String
+  actorType  String
   actorEmail String
   notes      String?
   metadata   Json?    @default("{}")
@@ -300,5 +301,22 @@ model PaymentAdvance {
 
   @@index([userId])
   @@index([invoiceId])
+}
+
+model SavingsGoal {
+  id                String   @id @default(uuid())
+  userId            String
+  title             String   @db.VarChar(100)
+  targetAmountUsdc  Decimal  @db.Decimal(18, 6)
+  currentAmountUsdc Decimal  @default(0) @db.Decimal(18, 6)
+  savingsPercentage Int
+  isActive          Boolean  @default(true)
+  status            String   @default("in_progress")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
   @@index([status])
 }
