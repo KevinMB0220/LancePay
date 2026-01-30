@@ -9,6 +9,10 @@ export async function GET() {
         export: '/api/routes-d/tax-reports/export?year={yyyy}&format={pdf|csv|json}',
         form1099: '/api/routes-d/tax-reports/1099?year={yyyy}&clientEmail={email}',
       },
+      taxClearance: {
+        tccGenerator: '/api/routes-d/tax/tcc-generator?year={yyyy}&format={csv|json}',
+        description: 'Tax Clearance Certificate (TCC) data export for Nigerian FIRS/LIRS filings',
+      },
     },
   })
 }
