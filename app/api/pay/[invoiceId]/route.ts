@@ -4,6 +4,7 @@ import { createReferralEarning } from '@/lib/referral'
 import { dispatchWebhooks } from '@/lib/webhooks'
 import { logAuditEvent, extractRequestMetadata } from '@/lib/audit'
 import { processSavingsOnPayment } from '@/lib/savings'
+import { processWaterfallPayments } from '@/lib/waterfall'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ invoiceId: string }> }) {
   const { invoiceId } = await params
@@ -97,6 +98,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   // Process savings goals auto-deduction
   await processSavingsOnPayment(updatedInvoice.userId, Number(updatedInvoice.amount))
+
+  // Process waterfall payments to sub-contractors
+  const waterfallResult = await processWaterfallPayments(updatedInvoice.id, Number(updatedInvoice.amount))
+  if (waterfallResult.processed) {
+    console.log(`Waterfall payments processed: ${waterfallResult.distributions.length} distributions, lead share: ${waterfallResult.leadShare}`)
+  }
 
   // Process auto-swap
   const { processAutoSwap } = await import('@/lib/auto-swap')
