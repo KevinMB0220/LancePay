@@ -1,0 +1,35 @@
+# Stellar Domain Verification (SEP-1)
+# This file serves as the verification record for LancePay.
+
+# Organization Documentation
+DOCUMENTATION_URL="https://lancepay.com/docs"
+ORG_NAME="LancePay"
+ORG_URL="https://lancepay.com"
+ORG_LOGO="https://lancepay.com/logo.png"
+ORG_DESCRIPTION="Instant international payments for Nigerian freelancers."
+ORG_TWITTER="lancepay_hq"
+
+# Account Verification
+[[ACCOUNTS]]
+transfer_server="https://api.lancepay.com/sep24"
+web_auth_endpoint="https://api.lancepay.com/auth"
+signing_key="G...PLATFORM_PUBLIC_KEY..."
+tags=["issuer", "platform"]
+
+# Asset Verification (USDC)
+[[CURRENCIES]]
+code="USDC"
+issuer="G...USDC_ISSUER..."
+status="live"
+display_decimals=2
+name="USD Coin"
+desc="USDC issued by LancePay (or Anchor)"
+image="https://lancepay.com/assets/usdc.png"
+
+# Validator Information (If running nodes)
+[QUORUM_SET]
+threshold_percent=67
+validators=[
+    "G...VALIDATOR_1...",
+    "G...VALIDATOR_2..."
+]

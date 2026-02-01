@@ -38,6 +38,7 @@ model User {
   userBadges       UserBadge[]
   auditEvents      AuditEvent[]
   savingsGoals     SavingsGoal[]
+  incomeVerifications IncomeVerification[]  
   payoutBatches    PayoutBatch[]
   manualPayments   ManualPayment[] @relation("ManualPaymentVerifier")
   collaborations   InvoiceCollaborator[] @relation("SubContractorCollaborations")
@@ -354,7 +355,6 @@ model AuditEvent {
   @@index([eventType])
   @@index([createdAt])
 }
-
 model SavingsGoal {
   id                String   @id @default(uuid())
   userId            String
@@ -371,27 +371,6 @@ model SavingsGoal {
 
   @@index([userId])
   @@index([status])
-}
-
-model ManualPayment {
-  id          String    @id @default(uuid())
-  invoiceId   String
-  clientName  String    @db.VarChar(100)
-  amountPaid  Decimal   @db.Decimal(18, 2)
-  currency    String    @default("NGN") @db.VarChar(10)
-  receiptUrl  String    @db.VarChar(512)
-  status      String    @default("pending") @db.VarChar(20)
-  notes       String?   @db.Text
-  createdAt   DateTime  @default(now())
-  verifiedAt  DateTime?
-  verifiedBy  String?
-
-  invoice  Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  verifier User?   @relation("ManualPaymentVerifier", fields: [verifiedBy], references: [id])
-
-  @@index([invoiceId])
-  @@index([status])
-  @@index([createdAt])
 }
 
 model ClientReputation {
@@ -413,13 +392,11 @@ model BadgeDefinition {
   description      String?
   criteriaJson     Json
   imageUrl         String?  @db.VarChar(512)
-  stellarAssetCode String   @db.VarChar(12)
+  stellarAssetCode String   @unique @db.VarChar(12)
   isActive         Boolean  @default(true)
   createdAt        DateTime @default(now())
 
   userBadges UserBadge[]
-
-  @@index([stellarAssetCode])
 }
 
 model UserBadge {
@@ -437,38 +414,19 @@ model UserBadge {
   @@index([badgeId])
 }
 
-model PayoutBatch {
-  id          String   @id @default(uuid())
-  userId      String
-  totalAmount Decimal  @db.Decimal(18, 6)
-  itemCount   Int
-  status      String   @default("processing") // 'processing', 'completed', 'partial_failure'
-  createdAt   DateTime @default(now())
+model IncomeVerification {
+  id            String   @id @default(uuid())
+  userId        String
+  tokenHash     String   @unique
+  recipientName String?
+  expiresAt     DateTime
+  accessCount   Int      @default(0)
+  createdAt     DateTime @default(now())
 
-  user  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  items PayoutItem[]
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@index([status])
-  @@index([createdAt])
-}
-
-model PayoutItem {
-  id                   String   @id @default(uuid())
-  batchId              String
-  recipientIdentifier  String   @db.VarChar(255) // Email, Wallet, or NUBAN
-  amount               Decimal  @db.Decimal(18, 6)
-  payoutType           String   @db.VarChar(20) // 'stellar_usdc', 'ngn_bank'
-  status               String   @default("pending") // 'pending', 'completed', 'failed'
-  errorMessage         String?  @db.Text
-  txHash               String?  @db.VarChar(255)
-  createdAt            DateTime @default(now())
-
-  batch PayoutBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
-
-  @@index([batchId])
-  @@index([status])
-  @@index([payoutType])
+  @@index([expiresAt])
 }
 
 model RiskAssessment {

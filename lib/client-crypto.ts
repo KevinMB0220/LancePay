@@ -47,10 +47,11 @@ async function deriveKey(secret: string, salt: string): Promise<CryptoKey> {
     )
 
     // Derive the actual AES key
+    // Use .buffer to get the underlying ArrayBuffer from Uint8Array
     return crypto.subtle.deriveKey(
         {
             name: 'PBKDF2',
-            salt: saltBuffer,
+            salt: saltBuffer.buffer as ArrayBuffer,
             iterations: 100000,
             hash: 'SHA-256',
         },

@@ -61,14 +61,6 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    if (invoice.user.email) {
-      await sendPaymentReceivedEmail({
-        to: invoice.user.email,
-        freelancerName: invoice.user.name || 'Freelancer',
-        clientName: invoice.clientName || 'Client',
-        invoiceNumber: invoice.invoiceNumber,
-        amount: Number(invoice.amount),
-        currency: invoice.currency,
     const paymentAmount = Number(invoice.amount)
 
     // Process auto-swap if user has an active rule

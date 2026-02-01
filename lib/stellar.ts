@@ -15,6 +15,21 @@ export const HORIZON_URL: string =
 export const server = new Horizon.Server(HORIZON_URL);
 
 /**
+ * USDC Asset
+ * Fallback to testnet USDC issuer if not configured
+ */
+const USDC_ISSUER = process.env.NEXT_PUBLIC_USDC_ISSUER || 
+  "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"; // Testnet USDC issuer
+
+/**
+ * Type definition for account balances
+ */
+export interface AccountBalance {
+  xlm: string; // Native XLM balance
+  usdc: string; // USDC balance
+}
+
+/**
  * Typed Stellar errors
  */
 export type StellarError =

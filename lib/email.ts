@@ -452,3 +452,35 @@ export async function sendManualPaymentVerifiedEmail(params: {
   })
 }
 
+// Internal transfer received - recipient receives notification of USDC transfer
+export async function sendTransferReceivedEmail(params: {
+  to: string
+  recipientName: string
+  senderName: string
+  amount: number
+  currency: string
+  memo?: string
+}) {
+  return sendEmail({
+    to: params.to,
+    subject: `💸 You received ${params.currency} ${params.amount.toFixed(2)} from ${params.senderName}`,
+    html: `
+      <div style="font-family: system-ui, sans-serif; max-width: 500px; margin: 0 auto; padding: 24px;">
+        <h2 style="color: #10B981;">Transfer Received! 💸</h2>
+        <p>Hi ${params.recipientName},</p>
+        <p>Great news! You've received a transfer from <strong>${params.senderName}</strong>.</p>
+
+        <div style="background: #ECFDF5; border: 1px solid #A7F3D0; padding: 24px; border-radius: 12px; text-align: center; margin: 20px 0;">
+          <div style="font-size: 32px; font-weight: bold; color: #065F46;">$${params.amount.toFixed(2)}</div>
+          <div style="color: #065F46;">${params.currency}</div>
+        </div>
+        
+        ${params.memo ? `<p><strong>Memo:</strong> ${params.memo}</p>` : ''}
+
+        <p>The funds are now available in your LancePay wallet.</p>
+
+        <p style="color: #666; font-size: 12px; margin-top: 20px;">LancePay - Get paid globally, withdraw locally</p>
+      </div>
+    `,
+  })
+}

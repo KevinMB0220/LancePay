@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check eligibility
-    const criteria = badge.criteriaJson as BadgeCriteria;
+    const criteria = badge.criteriaJson as unknown as BadgeCriteria;
     const eligibility = await checkBadgeEligibility(user.id, criteria);
 
     if (!eligibility.eligible) {

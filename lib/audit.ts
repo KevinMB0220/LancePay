@@ -1,5 +1,6 @@
 import { createHmac } from 'crypto'
 import { prisma } from '@/lib/db'
+import type { Prisma } from '@prisma/client'
 
 const AUDIT_SECRET = process.env.AUDIT_SECRET || 'default-audit-secret-change-in-production'
 
@@ -44,7 +45,7 @@ export async function logAuditEvent(
       invoiceId,
       eventType,
       actorId,
-      metadata,
+      metadata: metadata ? (metadata as Prisma.InputJsonValue) : undefined,
       signature,
     },
   })

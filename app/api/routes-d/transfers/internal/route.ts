@@ -135,6 +135,8 @@ export async function POST(request: NextRequest) {
     const now = new Date()
     await prisma.$transaction(async (tx) => {
       // Sender's "sent" transaction
+      // Note: We use externalId to store a unique identifier for correlation
+      // and error field to store memo if needed (since no memo field exists)
       await tx.transaction.create({
         data: {
           userId: sender.id,
@@ -143,9 +145,8 @@ export async function POST(request: NextRequest) {
           amount: amountNum,
           currency: 'USD',
           txHash,
-          senderId: sender.id,
-          recipientId: recipient.id,
-          memo: memo || null,
+          externalId: `${txHash}_out`,
+          error: memo ? `Memo: ${memo}` : undefined,
           completedAt: now,
         },
       })
@@ -159,9 +160,8 @@ export async function POST(request: NextRequest) {
           amount: amountNum,
           currency: 'USD',
           txHash,
-          senderId: sender.id,
-          recipientId: recipient.id,
-          memo: memo || null,
+          externalId: `${txHash}_in`,
+          error: memo ? `Memo: ${memo}` : undefined,
           completedAt: now,
         },
       })
@@ -171,8 +171,10 @@ export async function POST(request: NextRequest) {
     if (recipient.email) {
       await sendTransferReceivedEmail({
         to: recipient.email,
+        recipientName: recipient.name || 'LancePay User',
         senderName: sender.name || 'A LancePay user',
         amount: amountNum,
+        currency: 'USDC',
         memo: memo,
       })
     }
