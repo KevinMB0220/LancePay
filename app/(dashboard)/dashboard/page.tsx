@@ -1,4 +1,4 @@
-'use client'
+"use client";
 
 import { usePrivy } from '@privy-io/react-auth'
 import { useState, useEffect, useCallback } from 'react'
@@ -9,14 +9,18 @@ import { QuickActions } from '@/components/dashboard/quick-actions'
 import { TransactionList } from '@/components/dashboard/transaction-list'
 
 interface Transaction {
-  id: string
-  type: string
-  status: string
-  amount: number
-  currency: string
-  createdAt: string
-  invoice?: { invoiceNumber: string; clientName?: string | null; description: string } | null
-  bankAccount?: { bankName: string; accountNumber: string } | null
+  id: string;
+  type: string;
+  status: string;
+  amount: number;
+  currency: string;
+  createdAt: string;
+  invoice?: {
+    invoiceNumber: string;
+    clientName?: string | null;
+    description: string;
+  } | null;
+  bankAccount?: { bankName: string; accountNumber: string } | null;
 }
 
 interface Portfolio {
@@ -61,10 +65,19 @@ export default function DashboardPage() {
     fetchData()
   }, [fetchData])
 
-  const greeting = profile?.name ? `Hey, ${profile.name}! 👋` : 'Welcome back! 👋'
+  const greeting = profile?.name
+    ? `Hey, ${profile.name}! 👋`
+    : "Welcome back! 👋";
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
+      {isMockMode && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
+          <strong>Demo Mode:</strong> You're viewing mock data. API calls are
+          disabled.
+        </div>
+      )}
+
       <div>
         <p className="text-sm text-brand-gray mb-1">Dashboard</p>
         <h1 className="text-3xl font-bold text-brand-black">{greeting}</h1>
@@ -90,5 +103,5 @@ export default function DashboardPage() {
         <TransactionList transactions={transactions} isLoading={isLoading} />
       </div>
     </div>
-  )
+  );
 }

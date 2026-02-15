@@ -24,7 +24,28 @@ export function BalanceCard({ balance, isLoading, xlmBalance }: BalanceCardProps
         <div className="h-10 bg-gray-200 rounded w-32 mb-2" />
         <div className="h-4 bg-gray-200 rounded w-40" />
       </div>
-    )
+    );
+  }
+
+  // Handle different balance formats
+  let displayBalance = "$0.00";
+  let localEquivalent = "₦0";
+  let rate = 0;
+
+  if (balance) {
+    // Format 1: { available: { display: string }, localEquivalent: { display: string, rate: number } }
+    if (balance.available?.display) {
+      displayBalance = balance.available.display;
+      localEquivalent = balance.localEquivalent?.display || "₦0";
+      rate = balance.localEquivalent?.rate || 0;
+    }
+    // Format 2: { usdc: string, usd: string }
+    else if (balance.usdc || balance.usd) {
+      const amount = parseFloat(balance.usdc || balance.usd || "0");
+      displayBalance = `$${amount.toFixed(2)}`;
+      rate = 1600; // Default rate
+      localEquivalent = `₦${(amount * rate).toLocaleString()}`;
+    }
   }
 
   const formatter = new Intl.NumberFormat('en-US', {
@@ -71,5 +92,5 @@ export function BalanceCard({ balance, isLoading, xlmBalance }: BalanceCardProps
         </div>
       </div>
     </div>
-  )
+  );
 }
