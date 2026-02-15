@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     if (!recipientName || !durationDays) {
       return NextResponse.json(
         { error: "recipientName and durationDays are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -44,7 +44,10 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     console.error(err);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 },
+    );
   }
 }
 
@@ -53,9 +56,10 @@ export async function POST(req: NextRequest) {
 // ---------------------------
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { token: string } }
+  { params }: { params: Promise<{ token: string }> },
 ) {
-  const tokenHash = hashToken(params.token);
+  const { token } = await params;
+  const tokenHash = hashToken(token);
 
   const verification = await prisma.incomeVerification.findUnique({
     where: { tokenHash },
@@ -84,14 +88,14 @@ export async function GET(
 
   const monthlyMap: Record<string, number> = {};
 
-invoices.forEach((i) => {
-  if (!i.paidAt) return; // skip if paidAt is null
-  const key = `${i.paidAt.getFullYear()}-${i.paidAt.getMonth() + 1}`;
-  // Convert Decimal to number inline
-  const amount = typeof i.amount === "number" ? i.amount : i.amount.toNumber();
-  monthlyMap[key] = (monthlyMap[key] || 0) + amount;
-});
-
+  invoices.forEach((i) => {
+    if (!i.paidAt) return; // skip if paidAt is null
+    const key = `${i.paidAt.getFullYear()}-${i.paidAt.getMonth() + 1}`;
+    // Convert Decimal to number inline
+    const amount =
+      typeof i.amount === "number" ? i.amount : i.amount.toNumber();
+    monthlyMap[key] = (monthlyMap[key] || 0) + amount;
+  });
 
   const monthlyValues = Object.values(monthlyMap);
   const total = monthlyValues.reduce((a, b) => a + b, 0);
@@ -117,7 +121,7 @@ invoices.forEach((i) => {
     recipient: verification.recipientName,
     verifiedOnChain: true,
     accountAgeMonths: Math.floor(
-      (Date.now() - user!.createdAt.getTime()) / (1000 * 60 * 60 * 24 * 30)
+      (Date.now() - user!.createdAt.getTime()) / (1000 * 60 * 60 * 24 * 30),
     ),
     stats: {
       averageMonthlyIncome: average,
