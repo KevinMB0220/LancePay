@@ -3,6 +3,7 @@
 import { usePrivy } from '@privy-io/react-auth'
 import { useState, useEffect, useCallback } from 'react'
 import { BalanceCard } from '@/components/dashboard/balance-card'
+import { ReportsSection } from '@/components/dashboard/reports-section'
 import { AssetList } from '@/components/dashboard/asset-list'
 import { TrustlineManager } from '@/components/dashboard/trustline-manager'
 import { QuickActions } from '@/components/dashboard/quick-actions'
@@ -90,6 +91,7 @@ export default function DashboardPage() {
       />
 
       <QuickActions />
+      <ReportsSection />
 
       <AssetList
         assets={balance?.assets || []}
