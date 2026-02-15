@@ -21,11 +21,6 @@ export const server = new Horizon.Server(HORIZON_URL);
 const USDC_ISSUER = process.env.NEXT_PUBLIC_USDC_ISSUER ||
   "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"; // Testnet USDC issuer
 
-export const USDC_ASSET = new Asset(
-  process.env.NEXT_PUBLIC_USDC_CODE || "USDC",
-  USDC_ISSUER,
-);
-
 /**
  * Type definition for account balances
  */
@@ -59,34 +54,51 @@ interface StellarErrorResponse {
 }
 
 /**
- * Get balances of XLM and USDC for a Stellar account
+ * USDC Asset
+ */
+export const USDC_ASSET = new Asset(
+  process.env.NEXT_PUBLIC_USDC_CODE || "USDC",
+  process.env.NEXT_PUBLIC_USDC_ISSUER!,
+);
+
+export interface AssetBalance {
+  asset_type: "native" | "credit_alphanum4" | "credit_alphanum12" | "liquidity_pool_shares";
+  asset_code?: string;
+  asset_issuer?: string;
+  balance: string;
+  limit?: string;
+  buying_liabilities?: string;
+  selling_liabilities?: string;
+}
+
+/**
+ * Get all balances for a Stellar account
  * @param publicKey Stellar account public key
- * @returns Promise<AccountBalance>
+ * @returns Promise<AssetBalance[]>
  * @throws StellarError
  */
 export async function getAccountBalance(
   publicKey: string,
-): Promise<AccountBalance> {
+): Promise<AssetBalance[]> {
   try {
-    const account =
-      await server.loadAccount(publicKey);
+    const account = await server.loadAccount(publicKey);
 
-    const xlmBalance: string =
-      account.balances.find(
-        (b: any) => b.asset_type === "native",
-      )?.balance || "0";
-
-    const usdcBalance: string =
-      account.balances.find(
-        (b: any) =>
-          b.asset_type !== "native" &&
-          b.asset_code === USDC_ASSET.code &&
-          b.asset_issuer === USDC_ASSET.issuer,
-      )?.balance || "0";
-
-    return { xlm: xlmBalance, usdc: usdcBalance };
+    // Map Horizon response to our interface
+    return account.balances.map((b: any) => ({
+      asset_type: b.asset_type,
+      asset_code: b.asset_code || (b.asset_type === 'native' ? 'XLM' : undefined),
+      asset_issuer: b.asset_issuer,
+      balance: b.balance,
+      limit: b.limit,
+      buying_liabilities: b.buying_liabilities,
+      selling_liabilities: b.selling_liabilities
+    }));
   } catch (error: unknown) {
     console.error("Error fetching account balance:", error);
+    // If account doesn't exist yet, return empty balances instead of throwing
+    // This allows the UI to handle "new account" state gracefully if needed
+    // or we can let the caller handle the 404.
+    // For now, let's stick to the existing error handling pattern but maybe refine it.
     throw {
       type: "network_error",
       message: "Failed to fetch Stellar account balance.",
@@ -103,12 +115,27 @@ export function isValidStellarAddress(address: string): boolean {
   return StrKey.isValidEd25519PublicKey(address);
 }
 
+const STELLAR_TEXT_MEMO_MAX_BYTES = 28;
+
+function sanitizeStellarTextMemo(memo?: string): string | null {
+  if (!memo) return null;
+  let trimmed = memo.trim();
+  if (!trimmed) return null;
+
+  while (Buffer.byteLength(trimmed, "utf8") > STELLAR_TEXT_MEMO_MAX_BYTES) {
+    trimmed = trimmed.slice(0, -1);
+  }
+
+  return trimmed || null;
+}
+
 /**
  * Send USDC payment from one Stellar account to another
  * @param fromPublicKey Sender public key
  * @param fromSecretKey Sender secret key
  * @param toPublicKey Recipient public key
  * @param amount Amount of USDC to send (string)
+ * @param memo Optional transaction memo (truncated to 28 bytes)
  * @returns transaction hash
  * @throws StellarError
  */
@@ -117,6 +144,7 @@ export async function sendUSDCPayment(
   fromSecretKey: string,
   toPublicKey: string,
   amount: string,
+  memo?: string,
 ): Promise<string> {
   if (!isValidStellarAddress(toPublicKey)) {
     throw {
@@ -129,7 +157,7 @@ export async function sendUSDCPayment(
     const senderKeypair = Keypair.fromSecret(fromSecretKey);
     const account = await server.loadAccount(fromPublicKey);
 
-    const transaction = new TransactionBuilder(account, {
+    const builder = new TransactionBuilder(account, {
       fee: (await server.fetchBaseFee()).toString(),
       networkPassphrase: STELLAR_NETWORK,
     })
@@ -140,8 +168,14 @@ export async function sendUSDCPayment(
           amount,
         }),
       )
-      .setTimeout(30)
-      .build();
+      .setTimeout(30);
+
+    const safeMemo = sanitizeStellarTextMemo(memo);
+    if (safeMemo) {
+      builder.addMemo(Memo.text(safeMemo));
+    }
+
+    const transaction = builder.build();
 
     transaction.sign(senderKeypair);
 
@@ -340,72 +374,87 @@ export async function hasBadge(
 }
 
 /**
- * Fetch full transaction history for a Stellar account with pagination
- * @param publicKey Stellar account public key
- * @param start Optional start date (inclusive)
- * @param end Optional end date (inclusive)
- * @returns Promise<any[]> Array of transaction records
+ * Add a trustline for an asset
+ * @param secretKey User's secret key
+ * @param assetCode Asset code
+ * @param assetIssuer Asset issuer
+ * @returns transaction hash
  */
-export async function fetchFullTransactionHistory(
-  publicKey: string,
-  start?: Date,
-  end?: Date,
-): Promise<any[]> {
-  const allTransactions: any[] = [];
-  let cursor: string | undefined;
-
-  // Safety limit to prevent infinite loops or timeouts
-  const MAX_PAGES = 50;
-  let pageCount = 0;
-
+export async function addTrustline(
+  secretKey: string,
+  assetCode: string,
+  assetIssuer: string
+): Promise<string> {
   try {
-    while (pageCount < MAX_PAGES) {
-      const builder = server.payments().forAccount(publicKey).limit(100).order("desc");
+    const keypair = Keypair.fromSecret(secretKey);
+    const account = await server.loadAccount(keypair.publicKey());
+    const asset = new Asset(assetCode, assetIssuer);
 
-      if (cursor) {
-        builder.cursor(cursor);
-      }
+    const transaction = new TransactionBuilder(account, {
+      fee: (await server.fetchBaseFee()).toString(),
+      networkPassphrase: STELLAR_NETWORK,
+    })
+      .addOperation(
+        Operation.changeTrust({
+          asset,
+          source: keypair.publicKey(),
+        })
+      )
+      .setTimeout(30)
+      .build();
 
-      const response = await builder.call();
-      const records = response.records;
+    transaction.sign(keypair);
+    const result = await server.submitTransaction(transaction);
+    return result.hash;
+  } catch (error) {
+    console.error("Error adding trustline:", error);
+    throw {
+      type: "network_error", // Simplify error type for now
+      message: "Failed to add trustline.",
+    } as StellarError;
+  }
+}
 
-      if (records.length === 0) {
-        break;
-      }
+/**
+ * Remove a trustline for an asset
+ * @param secretKey User's secret key
+ * @param assetCode Asset code
+ * @param assetIssuer Asset issuer
+ * @returns transaction hash
+ */
+export async function removeTrustline(
+  secretKey: string,
+  assetCode: string,
+  assetIssuer: string
+): Promise<string> {
+  try {
+    const keypair = Keypair.fromSecret(secretKey);
+    const account = await server.loadAccount(keypair.publicKey());
+    const asset = new Asset(assetCode, assetIssuer);
 
-      for (const record of records) {
-        const txDate = new Date(record.created_at);
+    // To remove a trustline, you set the limit to 0
+    const transaction = new TransactionBuilder(account, {
+      fee: (await server.fetchBaseFee()).toString(),
+      networkPassphrase: STELLAR_NETWORK,
+    })
+      .addOperation(
+        Operation.changeTrust({
+          asset,
+          limit: "0",
+          source: keypair.publicKey(),
+        })
+      )
+      .setTimeout(30)
+      .build();
 
-        // Filter by date range if provided
-        if (end && txDate > end) continue; // Should not happen with desc order, but safe to check
-        if (start && txDate < start) {
-          // Since we order by desc, if we hit a date older than start, we can stop fetching
-          return allTransactions;
-        }
-
-        allTransactions.push(record);
-      }
-
-      // Update cursor for next page
-      cursor = records[records.length - 1].paging_token;
-      pageCount++;
-
-      // If we got fewer records than limit, we've reached the end
-      if (records.length < 100) {
-        break;
-      }
-    }
-
-    return allTransactions;
-  } catch (error: any) {
-    if (error.response?.status === 404) {
-      console.log("Stellar account not found or has no history, returning empty list.");
-      return [];
-    }
-    console.error("Error fetching transaction history:", error);
+    transaction.sign(keypair);
+    const result = await server.submitTransaction(transaction);
+    return result.hash;
+  } catch (error) {
+    console.error("Error removing trustline:", error);
     throw {
       type: "network_error",
-      message: "Failed to fetch transaction history from Stellar.",
+      message: "Failed to remove trustline.",
     } as StellarError;
   }
 }

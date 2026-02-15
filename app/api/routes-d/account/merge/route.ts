@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     if (!publicKey) {
       return NextResponse.json(
         { error: "Public key required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     console.error("Error checking account merge eligibility:", error);
     return NextResponse.json(
       { error: "Failed to check account" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     if (!secretKey) {
       return NextResponse.json(
         { error: "Account secret key required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -58,14 +58,13 @@ export async function POST(req: NextRequest) {
     // Perform cleanup and merge
     const result = await cleanupAndMergeAccount(
       accountKeypair,
-      destinationAddress
+      destinationAddress,
     );
 
     // TODO: Mark user as deleted in database
     // TODO: Scrub sensitive personal data
 
     return NextResponse.json({
-      success: true,
       message: "Account successfully merged and closed",
       ...result,
     });
@@ -73,7 +72,7 @@ export async function POST(req: NextRequest) {
     console.error("Account merge error:", error);
     return NextResponse.json(
       { error: error.message || "Failed to merge account" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

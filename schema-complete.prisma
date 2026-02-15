@@ -1,0 +1,541 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String   @id @default(uuid())
+  privyId          String   @unique
+  email            String   @unique
+  name             String?
+  phone            String?
+  referralCode     String?  @unique
+  referredById     String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  backupCodes      String[] @default([])
+  twoFactorEnabled Boolean  @default(false)
+  twoFactorSecret  String?
+  
+  virtualAccount      VirtualAccount? 
+  wallet              Wallet?
+  bankAccounts        BankAccount[]
+  invoices            Invoice[]
+  transactions        Transaction[]
+  reminderSettings    ReminderSettings?
+  autoSwapRule        AutoSwapRule?
+  referredBy          User?             @relation("UserReferrals", fields: [referredById], references: [id])
+  referrals           User[]            @relation("UserReferrals")
+  referralEarnings    ReferralEarning[] @relation("ReferrerEarnings")
+  earningsFromMe      ReferralEarning[] @relation("ReferredUserEarnings")
+  paymentAdvances     PaymentAdvance[]
+  apiKeys             ApiKey[]
+  brandingSettings    BrandingSettings?
+  webhooks            UserWebhook[]
+  userBadges          UserBadge[]
+  auditEvents         AuditEvent[]
+  savingsGoals        SavingsGoal[]
+  incomeVerifications IncomeVerification[]  
+  payoutBatches       PayoutBatch[]
+  manualPayments      ManualPayment[] @relation("ManualPaymentVerifier")
+  collaborations      InvoiceCollaborator[] @relation("SubContractorCollaborations")
+}
+
+model Wallet {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  address   String   @unique
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model BankAccount {
+  id            String   @id @default(uuid())
+  userId        String
+  bankName      String
+  bankCode      String
+  accountNumber String
+  accountName   String
+  isVerified    Boolean  @default(false)
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  user          User           @relation(fields: [userId], references: [id])
+  withdrawals   Transaction[]  @relation("WithdrawalBank")
+  autoSwapRules AutoSwapRule[]
+}
+
+model VirtualAccount {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  bankName      String   @db.VarChar(100)
+  accountNumber String   @unique @db.VarChar(20)
+  accountName   String   @db.VarChar(255)
+  provider      String   @db.VarChar(50)
+  providerRef   String?  @db.VarChar(255)
+  status        String   @default("active") @db.VarChar(20)
+  createdAt     DateTime @default(now())
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[] @relation("VirtualAccountDeposits")
+
+  @@index([userId])
+  @@index([accountNumber])
+  @@index([provider])
+  @@index([status])
+}
+
+model Invoice {
+  id            String    @id @default(uuid())
+  userId        String
+  invoiceNumber String    @unique
+  clientEmail   String
+  clientName    String?
+  description   String
+  amount        Decimal   @db.Decimal(10, 2)
+  currency      String    @default("USD")
+  status        String    @default("pending")
+  paymentLink   String    @unique
+  dueDate       DateTime?
+  paidAt        DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user                    User              @relation(fields: [userId], references: [id])
+  transaction             Transaction?
+  paymentReminders        PaymentReminder[]
+  dispute                 Dispute?
+  collaborators           InvoiceCollaborator[]
+  escrowEnabled           Boolean           @default(false)
+  escrowStatus            String            @default("none")
+  escrowReleaseConditions String?
+  escrowReleasedAt        DateTime?
+  escrowDisputedAt        DateTime?
+  escrowEvents            EscrowEvent[]
+  lienActive              Boolean           @default(false)
+  advances                PaymentAdvance[]
+  auditEvents             AuditEvent[]
+  isConfidential          Boolean           @default(false)
+  encryptedPayload        String?           @db.Text
+  decryptionSalt          String?
+  messages                InvoiceMessage[]
+  manualPayments          ManualPayment[]
+}
+
+model InvoiceMessage {
+  id            String   @id @default(uuid())
+  invoiceId     String
+  senderId      String?
+  senderType    String
+  senderName    String
+  content       String   @db.Text
+  attachmentUrl String?  @db.VarChar(512)
+  isInternal    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@index([createdAt])
+}
+
+model PaymentReminder {
+  id           String   @id @default(uuid())
+  invoiceId    String
+  reminderType String
+  daysOffset   Int?
+  sentAt       DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model ReminderSettings {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  enabled       Boolean  @default(true)
+  beforeDueDays Int[]    @default([3, 1])
+  onDueEnabled  Boolean  @default(true)
+  afterDueDays  Int[]    @default([1, 3, 7])
+  customMessage String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Transaction {
+  id                String    @id @default(uuid())
+  userId            String
+  type              String
+  status            String    @default("pending")
+  amount            Decimal   @db.Decimal(10, 2)
+  currency          String    @default("USD")
+  ngnAmount         Decimal?  @db.Decimal(15, 2)
+  exchangeRate      Decimal?  @db.Decimal(10, 4)
+  invoiceId         String?   @unique
+  bankAccountId     String?
+  txHash            String?
+  createdAt         DateTime  @default(now())
+  completedAt       DateTime?
+  autoSwapTriggered Boolean   @default(false)
+  error             String?
+  externalId        String?   @unique
+  virtualAccountId  String?
+
+  user           User             @relation(fields: [userId], references: [id])
+  invoice        Invoice?         @relation(fields: [invoiceId], references: [id])
+  bankAccount    BankAccount?     @relation("WithdrawalBank", fields: [bankAccountId], references: [id])
+  virtualAccount VirtualAccount?  @relation("VirtualAccountDeposits", fields: [virtualAccountId], references: [id])
+}
+
+model ReferralEarning {
+  id             String   @id @default(uuid())
+  referrerId     String
+  referredUserId String
+  invoiceId      String
+  amountUsdc     Decimal  @db.Decimal(18, 6)
+  platformFee    Decimal  @db.Decimal(18, 6)
+  status         String   @default("earned")
+  createdAt      DateTime @default(now())
+
+  referrer     User @relation("ReferrerEarnings", fields: [referrerId], references: [id], onDelete: Cascade)
+  referredUser User @relation("ReferredUserEarnings", fields: [referredUserId], references: [id], onDelete: Cascade)
+
+  @@index([referrerId])
+  @@index([referredUserId])
+  @@index([createdAt])
+}
+
+model ApiKey {
+  id         String    @id @default(uuid())
+  userId     String
+  name       String
+  keyHint    String
+  hashedKey  String    @unique
+  isActive   Boolean   @default(true)
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([hashedKey])
+}
+
+model AutoSwapRule {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  percentage    Int
+  bankAccountId String
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bankAccount BankAccount @relation(fields: [bankAccountId], references: [id])
+}
+
+model BulkInvoiceJob {
+  id           String    @id @default(uuid())
+  userId       String
+  status       String    @default("processing")
+  totalCount   Int
+  successCount Int       @default(0)
+  failedCount  Int       @default(0)
+  results      Json      @default("[]")
+  createdAt    DateTime  @default(now())
+  completedAt  DateTime?
+
+  @@index([userId])
+}
+
+model Dispute {
+  id              String    @id @default(uuid())
+  invoiceId       String    @unique
+  initiatedBy     String
+  initiatorEmail  String
+  reason          String
+  requestedAction String
+  status          String    @default("open")
+  resolution      String?
+  resolvedBy      String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  resolvedAt      DateTime?
+
+  invoice  Invoice          @relation(fields: [invoiceId], references: [id])
+  messages DisputeMessage[]
+
+  @@index([invoiceId])
+}
+
+model DisputeMessage {
+  id          String   @id @default(uuid())
+  disputeId   String
+  senderType  String
+  senderEmail String
+  message     String
+  attachments Json     @default("[]")
+  createdAt   DateTime @default(now())
+
+  dispute Dispute @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+
+  @@index([disputeId])
+}
+
+model EscrowEvent {
+  id         String   @id @default(uuid())
+  invoiceId  String
+  eventType  String
+  actorType  String
+  actorEmail String
+  notes      String?
+  metadata   Json?    @default("{}")
+  createdAt  DateTime @default(now())
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+}
+
+model BrandingSettings {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  logoUrl      String?
+  primaryColor String   @default("#000000")
+  footerText   String?
+  signatureUrl String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserWebhook {
+  id               String    @id @default(uuid())
+  userId           String
+  targetUrl        String    @db.VarChar(512)
+  signingSecret    String    @db.VarChar(255)
+  description      String?   @db.VarChar(100)
+  isActive         Boolean   @default(true)
+  subscribedEvents String[]  @default(["invoice.paid"])
+  lastTriggeredAt  DateTime?
+  createdAt        DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isActive])
+}
+
+model PaymentAdvance {
+  id                      String    @id @default(uuid())
+  userId                  String
+  invoiceId               String
+  requestedAmountUSDC     Decimal   @db.Decimal(10, 2)
+  advancedAmountUSDC      Decimal   @db.Decimal(10, 2)
+  advancedAmountNGN       Decimal   @db.Decimal(15, 2)
+  exchangeRate            Decimal   @db.Decimal(10, 4)
+  feePercentage           Decimal   @default(2.00) @db.Decimal(5, 2)
+  feeAmountUSDC           Decimal   @db.Decimal(10, 2)
+  totalRepaymentUSDC      Decimal   @db.Decimal(10, 2)
+  status                  String    @default("pending")
+  yellowCardTransactionId String?
+  disbursedAt             DateTime?
+  repaidAt                DateTime?
+  error                   String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([invoiceId])
+}
+
+model AuditEvent {
+  id        String   @id @default(uuid())
+  invoiceId String
+  eventType String   @db.VarChar(50)
+  actorId   String?
+  metadata  Json?
+  signature String
+  createdAt DateTime @default(now())
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  actor   User?   @relation(fields: [actorId], references: [id])
+
+  @@index([invoiceId])
+  @@index([eventType])
+  @@index([createdAt])
+}
+
+model SavingsGoal {
+  id                String   @id @default(uuid())
+  userId            String
+  title             String   @db.VarChar(100)
+  targetAmountUsdc  Decimal  @db.Decimal(18, 6)
+  currentAmountUsdc Decimal  @default(0) @db.Decimal(18, 6)
+  savingsPercentage Int
+  isActive          Boolean  @default(true)
+  status            String   @default("in_progress")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+model ClientReputation {
+  id            String    @id @default(uuid())
+  clientEmail   String    @unique @map("client_email")
+  domainType    String?   @map("domain_type")
+  paymentScore  Int       @default(0) @map("payment_score")
+  isVerified    Boolean   @default(false) @map("is_verified")
+  lastCheckedAt DateTime  @default(now()) @map("last_checked_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@index([clientEmail])
+  @@map("client_reputations")
+}
+
+model BadgeDefinition {
+  id               String   @id @default(uuid())
+  name             String   @db.VarChar(100)
+  description      String?
+  criteriaJson     Json
+  imageUrl         String?  @db.VarChar(512)
+  stellarAssetCode String   @db.VarChar(12)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+
+  userBadges UserBadge[]
+
+  @@index([stellarAssetCode])
+}
+
+model UserBadge {
+  id             String   @id @default(uuid())
+  userId         String
+  badgeId        String
+  stellarTxHash  String   @db.VarChar(255)
+  issuedAt       DateTime @default(now())
+
+  user  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge BadgeDefinition @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+  @@index([userId])
+  @@index([badgeId])
+}
+
+model IncomeVerification {
+  id            String   @id @default(uuid())
+  userId        String
+  tokenHash     String   @unique
+  recipientName String?
+  expiresAt     DateTime
+  accessCount   Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model RiskAssessment {
+  id         String   @id @default(uuid())
+  entityType String   @db.VarChar(20)
+  entityId   String
+  riskScore  Int
+  signals    Json?
+  status     String   @default("logged") @db.VarChar(20)
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([riskScore])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model SecurityWatchlist {
+  id        String   @id @default(uuid())
+  type      String   @db.VarChar(20)
+  value     String   @unique @db.VarChar(255)
+  reason    String?  @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([type])
+  @@index([value])
+}
+
+model InvoiceCollaborator {
+  id              String    @id @default(uuid())
+  invoiceId       String
+  subContractorId String
+  sharePercentage Decimal   @db.Decimal(5, 2)
+  payoutStatus    String    @default("pending") @db.VarChar(20)
+  internalTxId    String?   @db.VarChar(255)
+  paidAt          DateTime?
+  createdAt       DateTime  @default(now())
+
+  invoice       Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  subContractor User    @relation("SubContractorCollaborations", fields: [subContractorId], references: [id], onDelete: Cascade)
+
+  @@unique([invoiceId, subContractorId])
+  @@index([invoiceId])
+  @@index([subContractorId])
+  @@index([payoutStatus])
+}
+
+model PayoutBatch {
+  id              String    @id @default(uuid())
+  userId          String
+  status          String    @default("pending")
+  totalAmount     Decimal   @db.Decimal(18, 6)
+  totalRecipients Int
+  successCount    Int       @default(0)
+  failedCount     Int       @default(0)
+  results         Json      @default("[]")
+  createdAt       DateTime  @default(now())
+  completedAt     DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model ManualPayment {
+  id            String    @id @default(uuid())
+  invoiceId     String
+  amountPaid    Decimal   @db.Decimal(15, 2)
+  currency      String    @default("NGN")
+  paymentMethod String    @db.VarChar(50)
+  receiptUrl    String?   @db.VarChar(512)
+  notes         String?   @db.Text
+  status        String    @default("pending")
+  verifiedBy    String?
+  verifiedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  invoice  Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  verifier User?   @relation("ManualPaymentVerifier", fields: [verifiedBy], references: [id])
+
+  @@index([invoiceId])
+  @@index([status])
+  @@index([verifiedBy])
+}
