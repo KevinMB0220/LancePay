@@ -226,14 +226,15 @@ export function WithdrawModal({
   };
 
   // Poll transaction status
-  const pollStatus = useCallback(async () => {
-    if (!transactionId) return;
+  const pollStatus = useCallback(async (signal?: AbortSignal) => {
+    if (!transactionId) return false;
 
     try {
       const response = await fetch(`/api/sep24/status?transactionId=${transactionId}`, {
         headers: {
           'Authorization': `Bearer ${authToken}`,
         },
+        signal,
       });
 
       if (response.ok) {
@@ -241,13 +242,14 @@ export function WithdrawModal({
         setTxStatus(data.status);
         setStatusMessage(data.statusMessage);
 
-        // If terminal status, stop polling
         if (data.isComplete) {
           return true;
         }
       }
     } catch (error) {
-      console.error('Status poll error:', error);
+      if ((error as Error).name !== 'AbortError') {
+        console.error('Status poll error:', error);
+      }
     }
     return false;
   }, [transactionId, authToken]);
@@ -256,17 +258,30 @@ export function WithdrawModal({
   useEffect(() => {
     if (step !== 'status' || !transactionId) return;
 
-    const interval = setInterval(async () => {
-      const isComplete = await pollStatus();
-      if (isComplete) {
-        clearInterval(interval);
-      }
-    }, 5000);
+    const controller = new AbortController();
 
-    // Initial poll
-    pollStatus();
+    const run = async () => {
+      // Initial poll
+      const done = await pollStatus(controller.signal);
+      if (done || controller.signal.aborted) return;
 
-    return () => clearInterval(interval);
+      const interval = setInterval(async () => {
+        const isComplete = await pollStatus(controller.signal);
+        if (isComplete) {
+          clearInterval(interval);
+        }
+      }, 5000);
+
+      // Store interval id on controller so cleanup can reach it
+      (controller as any)._interval = interval;
+    };
+
+    run();
+
+    return () => {
+      controller.abort();
+      clearInterval((controller as any)._interval);
+    };
   }, [step, transactionId, pollStatus]);
 
   // Handle iframe completion (user triggers this)
