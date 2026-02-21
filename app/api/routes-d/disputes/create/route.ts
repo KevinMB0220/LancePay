@@ -28,7 +28,13 @@ export async function POST(request: NextRequest) {
       include: { user: { select: { id: true, email: true, name: true } } },
     })
     if (!invoice) return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
-    if (invoice.status !== 'paid') return NextResponse.json({ error: 'Only paid invoices can be disputed' }, { status: 400 })
+
+    if (invoice.status !== 'paid') {
+      return NextResponse.json(
+        { error: 'Only paid transactions are eligible for dispute resolution' },
+        { status: 400 }
+      )
+    }
 
     const isFreelancer = auth.user.id === invoice.userId
     const isClient = initiatorEmail.toLowerCase() === invoice.clientEmail.toLowerCase()
