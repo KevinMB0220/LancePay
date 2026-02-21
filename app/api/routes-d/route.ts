@@ -34,6 +34,9 @@ export async function GET() {
       verification: {
         clientCheck: '/api/routes-d/verification/client-check?email={email}',
       },
+      support: {
+        createTicket: '/api/routes-d/support/tickets',
+      },
     },
   })
 }
