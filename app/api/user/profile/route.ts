@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     // First try to find existing user
     let user = await prisma.user.findUnique({
       where: { privyId: claims.userId },
-      select: { id: true, email: true, name: true, phone: true, createdAt: true },
+      select: { id: true, email: true, name: true, phone: true, taxPercentage: true, createdAt: true },
     })
 
     // If not found, create with a unique email
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
           privyId: claims.userId,
           email: email,
         },
-        select: { id: true, email: true, name: true, phone: true, createdAt: true },
+        select: { id: true, email: true, name: true, phone: true, taxPercentage: true, createdAt: true },
       })
     }
 
@@ -41,7 +41,7 @@ export async function PUT(request: NextRequest) {
     const claims = await verifyAuthToken(authToken || '')
     if (!claims) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { name, phone, code } = await request.json()
+    const { name, phone, taxPercentage, code } = await request.json()
 
     // First try to find existing user
     let user = await prisma.user.findUnique({
@@ -67,11 +67,20 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    const taxPct = taxPercentage !== undefined ? Number(taxPercentage) : undefined
+    if (taxPct !== undefined && (taxPct < 0 || taxPct > 100)) {
+      return NextResponse.json({ error: 'taxPercentage must be between 0 and 100' }, { status: 400 })
+    }
+
     if (user) {
       // Update existing user
       user = await prisma.user.update({
         where: { privyId: claims.userId },
-        data: { name, phone },
+        data: {
+          name,
+          phone,
+          ...(taxPct !== undefined && { taxPercentage: taxPct }),
+        },
       })
     } else {
       // Create new user
@@ -81,7 +90,8 @@ export async function PUT(request: NextRequest) {
           privyId: claims.userId,
           email: email,
           name,
-          phone
+          phone,
+          ...(taxPct !== undefined && { taxPercentage: taxPct }),
         },
       })
     }

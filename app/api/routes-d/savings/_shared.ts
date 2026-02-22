@@ -50,22 +50,26 @@ export function formatSavingsGoal(goal: {
   savingsPercentage: number
   isActive: boolean
   status: string
+  isTaxVault: boolean
   createdAt: Date
   updatedAt: Date
 }) {
   const target = Number(goal.targetAmountUsdc)
   const current = Number(goal.currentAmountUsdc)
-  const progressPercent = target > 0 ? Math.min((current / target) * 100, 100) : 0
+  const progressPercent = goal.isTaxVault
+    ? null // tax vault has no target progress
+    : target > 0 ? Math.min((current / target) * 100, 100) : 0
 
   return {
     id: goal.id,
     title: goal.title,
-    targetAmountUsdc: target,
+    targetAmountUsdc: goal.isTaxVault ? null : target,
     currentAmountUsdc: current,
     savingsPercentage: goal.savingsPercentage,
     isActive: goal.isActive,
     status: goal.status,
-    progressPercent: Math.round(progressPercent * 100) / 100,
+    isTaxVault: goal.isTaxVault,
+    progressPercent: progressPercent !== null ? Math.round(progressPercent * 100) / 100 : null,
     createdAt: goal.createdAt.toISOString(),
     updatedAt: goal.updatedAt.toISOString(),
   }
