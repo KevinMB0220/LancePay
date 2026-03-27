@@ -90,8 +90,9 @@ function normalizeOptionalString(value: unknown, maxLength: number): string | nu
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   const user = await getAuthenticatedUser(request)
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -100,7 +101,7 @@ export async function PATCH(
   const body = await request.json()
   const contactDelegate = getContactDelegate()
   const existingContact = await contactDelegate.findUnique({
-    where: { id: params.id },
+    where: { id },
     select: {
       id: true,
       userId: true,
@@ -200,7 +201,7 @@ export async function PATCH(
   }
 
   const updatedContact = await contactDelegate.update({
-    where: { id: existingContact.id },
+    where: { id },
     data,
     select: {
       id: true,
@@ -226,8 +227,9 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   const user = await getAuthenticatedUser(request)
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -235,7 +237,7 @@ export async function DELETE(
 
   const contactDelegate = getContactDelegate()
   const contact = await contactDelegate.findUnique({
-    where: { id: params.id },
+    where: { id },
     select: { id: true, userId: true },
   })
 
@@ -247,7 +249,7 @@ export async function DELETE(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  await contactDelegate.delete({ where: { id: params.id } })
+  await contactDelegate.delete({ where: { id } })
 
   return new NextResponse(null, { status: 204 })
 }
