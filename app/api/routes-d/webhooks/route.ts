@@ -26,15 +26,18 @@ export async function GET(request: NextRequest) {
 
     const webhooks = await prisma.userWebhook.findMany({
       where: { userId: user.id },
+      orderBy: { createdAt: 'desc' },
       select: {
         id: true,
         targetUrl: true,
         description: true,
         isActive: true,
         subscribedEvents: true,
+        status: true,
+        lastTriggeredAt: true,
         createdAt: true,
+        // signingSecret intentionally excluded
       },
-      orderBy: { createdAt: 'desc' },
     })
 
     return NextResponse.json({ webhooks })

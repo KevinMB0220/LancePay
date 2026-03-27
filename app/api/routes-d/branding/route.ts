@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
       where: { userId: user.id },
     })
 
+
     return NextResponse.json({ branding: branding ?? null })
   } catch (error) {
     logger.error({ err: error }, 'Branding GET error')
